@@ -541,6 +541,8 @@ export const en: typeof ru = {
     transactionType_income: 'Incomes',
     onlyNew: 'Only New',
     showDeleted: 'Show Deleted',
+    categories: 'Categories',
+    accounts: 'Accounts',
     clearFilter: 'Clear Filters',
     clearField: 'Clear Field',
     extendedFilters: 'Advanced Filters',

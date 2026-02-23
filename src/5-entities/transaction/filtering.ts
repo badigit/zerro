@@ -1,5 +1,6 @@
 import type {
   TAccountId,
+  TISODate,
   TISOMonth,
   TTagId,
   TTransaction,
@@ -30,6 +31,8 @@ type AdditionalConditions = {
   month?: StringCondition<TISOMonth>
   account?: StringCondition<TAccountId>
   amount?: ValueCondition
+  dateFrom?: TISODate
+  dateTo?: TISODate
 }
 
 export type TrCondition = BasicConditions &
@@ -86,6 +89,10 @@ function checkKey(
       return checkAccount(tr, conditions[key])
     case 'amount':
       return checkAmount(tr, conditions[key])
+    case 'dateFrom':
+      return checkDateFrom(tr, conditions[key])
+    case 'dateTo':
+      return checkDateTo(tr, conditions[key])
 
     /* Handle logical operators */
     case 'or':
@@ -174,4 +181,14 @@ function checkAmount(tr: TTransaction, condition?: TrCondition['amount']) {
   if (type === TrType.Income) return checkValue(tr.income, condition)
   if (type === TrType.Outcome) return checkValue(tr.outcome, condition)
   return checkValue(tr.income, condition) || checkValue(tr.outcome, condition)
+}
+
+function checkDateFrom(tr: TTransaction, condition?: TrCondition['dateFrom']) {
+  if (!condition) return true
+  return tr.date >= condition
+}
+
+function checkDateTo(tr: TTransaction, condition?: TrCondition['dateTo']) {
+  if (!condition) return true
+  return tr.date <= condition
 }

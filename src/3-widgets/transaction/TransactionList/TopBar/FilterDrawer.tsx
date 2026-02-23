@@ -1,4 +1,4 @@
-import React, { FC } from 'react'
+import React, { FC, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Drawer,
@@ -14,11 +14,15 @@ import {
   SelectChangeEvent,
   FormControl,
   InputLabel,
+  Autocomplete,
 } from '@mui/material'
+import { DatePicker } from '@mui/x-date-pickers'
 import { Tooltip } from '6-shared/ui/Tooltip'
 import { CloseIcon } from '6-shared/ui/Icons'
 import { SmartSelect } from '6-shared/ui/SmartSelect'
+import { parseDate, toISODate } from '6-shared/helpers/date'
 import { TagSelect } from '5-entities/tag/ui/TagSelect'
+import { accountModel } from '5-entities/account'
 import { TrCondition } from '5-entities/transaction'
 import { TrType } from '5-entities/transaction'
 
@@ -45,6 +49,25 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
   ...rest
 }) => {
   const { t } = useTranslation('filterDrawer')
+  const populatedAccounts = accountModel.usePopulatedAccounts()
+
+  const accountOptions = useMemo(
+    () =>
+      Object.values(populatedAccounts)
+        .filter(a => !a.archive)
+        .sort((a, b) => a.title.localeCompare(b.title)),
+    [populatedAccounts]
+  )
+
+  const selectedAccountIds = useMemo(() => {
+    const cond = conditions.account
+    if (!cond) return []
+    if (typeof cond === 'string') return [cond]
+    if (typeof cond === 'object' && cond !== null && 'in' in cond && cond.in)
+      return cond.in as string[]
+    return []
+  }, [conditions.account])
+
   const handleTypeChange = (e: SelectChangeEvent<string>) => {
     const value = e.target.value as TrType
     setCondition({ type: value || undefined })
@@ -108,44 +131,36 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
           </Grid>
         </Box>
 
-        {/* <Box mt={3} display="flex">
-          <DateRangePicker
-            startText="Дата от"
-            endText="Дата до"
-            mask="__.__.____"
-            value={[conditions.dateFrom || null, conditions.dateTo || null]}
-            maxDate={endOfDay(new Date())}
-            defaultCalendarMonth={prevMonth(new Date())}
-            onChange={([dateFrom, dateTo]: [
-              number | Date | undefined,
-              number | Date | undefined
-            ]) => {
-              setCondition({
-                dateFrom: dateFrom && +startOfDay(dateFrom),
-                dateTo: dateTo && +endOfDay(dateTo),
-              })
-            }}
-            renderInput={(
-              startProps: TextFieldProps,
-              endProps: TextFieldProps
-            ) => (
-              <Grid container spacing={3}>
-                <Grid item xs={6}>
-                  <TextField {...startProps} />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    {...endProps}
-                    inputProps={{
-                      ...endProps.inputProps,
-                      placeholder: formatDate(new Date(), 'dd.MM.yyyy'),
-                    }}
-                  />
-                </Grid>
-              </Grid>
-            )}
-          />
-        </Box> */}
+        <Box sx={{ mt: 3, display: 'flex' }}>
+          <Grid container spacing={3}>
+            <Grid size={6}>
+              <DatePicker
+                label={t('dateFrom')}
+                value={conditions.dateFrom ? parseDate(conditions.dateFrom) : null}
+                onChange={date =>
+                  setCondition({
+                    dateFrom: date ? toISODate(date) : undefined,
+                  })
+                }
+                format="dd.MM.yyyy"
+                slotProps={{ textField: { variant: 'outlined', fullWidth: true } }}
+              />
+            </Grid>
+            <Grid size={6}>
+              <DatePicker
+                label={t('dateTo')}
+                value={conditions.dateTo ? parseDate(conditions.dateTo) : null}
+                onChange={date =>
+                  setCondition({
+                    dateTo: date ? toISODate(date) : undefined,
+                  })
+                }
+                format="dd.MM.yyyy"
+                slotProps={{ textField: { variant: 'outlined', fullWidth: true } }}
+              />
+            </Grid>
+          </Grid>
+        </Box>
         <Box sx={{ mt: 3 }}>
           <FormControl fullWidth>
             <InputLabel>{t('transactionType')}</InputLabel>
@@ -179,6 +194,28 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
             onChange={tags =>
               setCondition({ tags: tags as TrCondition['tags'] })
             }
+            label={t('categories')}
+          />
+        </Box>
+
+        <Box sx={{ mt: 3 }}>
+          <Autocomplete
+            multiple
+            options={accountOptions}
+            getOptionLabel={option => option.title}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            value={accountOptions.filter(a =>
+              selectedAccountIds.includes(a.id)
+            )}
+            onChange={(_e, value) => {
+              const ids = value.map(a => a.id)
+              setCondition({
+                account: ids.length ? { in: ids } : undefined,
+              })
+            }}
+            renderInput={params => (
+              <TextField {...params} label={t('accounts')} variant="outlined" />
+            )}
           />
         </Box>
 

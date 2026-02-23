@@ -519,6 +519,8 @@
     "transactionType_income": "Доходы",
     "onlyNew": "Только новые",
     "showDeleted": "Показать удалённые",
+    "categories": "Категории",
+    "accounts": "Счета",
     "clearFilter": "Очистить фильтры",
     "clearField": "Очистить поле",
     "extendedFilters": "Расширенные фильтры"
