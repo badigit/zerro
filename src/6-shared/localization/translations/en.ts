@@ -546,6 +546,7 @@ export const en: typeof ru = {
     showDeleted: 'Show Deleted',
     categories: 'Categories',
     accounts: 'Accounts',
+    merchants: 'Merchants',
     clearFilter: 'Clear Filters',
     clearField: 'Clear Field',
     extendedFilters: 'Advanced Filters',

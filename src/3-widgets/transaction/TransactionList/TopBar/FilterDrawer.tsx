@@ -23,6 +23,7 @@ import { SmartSelect } from '6-shared/ui/SmartSelect'
 import { parseDate, toISODate } from '6-shared/helpers/date'
 import { TagSelect } from '5-entities/tag/ui/TagSelect'
 import { accountModel } from '5-entities/account'
+import { merchantModel } from '5-entities/merchant'
 import { TrCondition } from '5-entities/transaction'
 import { TrType } from '5-entities/transaction'
 
@@ -50,6 +51,7 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
 }) => {
   const { t } = useTranslation('filterDrawer')
   const populatedAccounts = accountModel.usePopulatedAccounts()
+  const merchants = merchantModel.useMerchants()
 
   const accountOptions = useMemo(
     () =>
@@ -59,14 +61,21 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
     [populatedAccounts]
   )
 
-  const selectedAccountIds = useMemo(() => {
-    const cond = conditions.account
-    if (!cond) return []
-    if (typeof cond === 'string') return [cond]
-    if (typeof cond === 'object' && cond !== null && 'in' in cond && cond.in)
-      return cond.in as string[]
-    return []
-  }, [conditions.account])
+  const merchantOptions = useMemo(
+    () =>
+      Object.values(merchants).sort((a, b) => a.title.localeCompare(b.title)),
+    [merchants]
+  )
+
+  const selectedAccountIds = useMemo(
+    () => extractInIds(conditions.account),
+    [conditions.account]
+  )
+
+  const selectedMerchantIds = useMemo(
+    () => extractInIds(conditions.merchant),
+    [conditions.merchant]
+  )
 
   const handleTypeChange = (e: SelectChangeEvent<string>) => {
     const value = e.target.value as TrType
@@ -220,6 +229,27 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
         </Box>
 
         <Box sx={{ mt: 3 }}>
+          <Autocomplete
+            multiple
+            options={merchantOptions}
+            getOptionLabel={option => option.title}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+            value={merchantOptions.filter(m =>
+              selectedMerchantIds.includes(m.id)
+            )}
+            onChange={(_e, value) => {
+              const ids = value.map(m => m.id)
+              setCondition({
+                merchant: ids.length ? { in: ids } : undefined,
+              })
+            }}
+            renderInput={params => (
+              <TextField {...params} label={t('merchants')} variant="outlined" />
+            )}
+          />
+        </Box>
+
+        <Box sx={{ mt: 3 }}>
           <FormControlLabel
             label={t('onlyNew')}
             control={
@@ -265,6 +295,15 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
 }
 
 export default FilterDrawer
+
+/** Pulls a flat list of ids out of an `{ in: [...] }` / bare-string condition. */
+function extractInIds(cond: TrCondition['account' | 'merchant']): string[] {
+  if (!cond) return []
+  if (typeof cond === 'string') return [cond]
+  if (typeof cond === 'object' && cond !== null && 'in' in cond && cond.in)
+    return cond.in as string[]
+  return []
+}
 
 function getGteLte(amount: TrCondition['amount']) {
   if (amount === undefined || amount === null)

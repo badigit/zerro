@@ -14,6 +14,7 @@ import { Box, Typography, Theme } from '@mui/material'
 import { sendEvent } from '6-shared/helpers/tracking'
 import { useDebounce } from '6-shared/hooks/useDebounce'
 import { accountModel } from '5-entities/account'
+import { merchantModel } from '5-entities/merchant'
 import { trModel } from '5-entities/transaction'
 import { getEventPosition } from '3-widgets/global/shared/helpers'
 
@@ -218,14 +219,15 @@ function useFilteredTransactions(
 ) {
   const transactionsById = trModel.useTransactions()
   const allTransactionIds = trModel.useSortedTransactionIds()
+  const merchants = merchantModel.useMerchants()
   const groups = useMemo(() => {
-    const checker = trModel.checkRaw(conditions)
+    const checker = trModel.checkRaw(conditions, { merchants })
     const list = trIds || allTransactionIds
     return list
       .map(id => transactionsById[id])
       .filter(checker)
       .sort(trModel.compareTrDates)
-  }, [trIds, allTransactionIds, conditions, transactionsById])
+  }, [trIds, allTransactionIds, conditions, transactionsById, merchants])
   return groups
 }
 

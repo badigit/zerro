@@ -2,6 +2,7 @@ import type {
   TAccountId,
   TISODate,
   TISOMonth,
+  TMerchant,
   TTagId,
   TTransaction,
 } from '6-shared/types'
@@ -41,19 +42,31 @@ export type TrCondition = BasicConditions &
     and?: TrCondition[]
   }
 
-export const checkRaw =
-  (conditions?: TrCondition) =>
-  (tr: TTransaction): boolean =>
-    checkConditions(tr, conditions)
+/**
+ * Extra lookups the checker needs to resolve references (e.g. merchant id →
+ * title) that are not stored directly on the transaction.
+ */
+export type CheckContext = {
+  merchants?: Record<string, TMerchant>
+}
 
-function checkConditions(tr: TTransaction, conditions?: TrCondition): boolean {
+export const checkRaw =
+  (conditions?: TrCondition, ctx?: CheckContext) =>
+  (tr: TTransaction): boolean =>
+    checkConditions(tr, conditions, ctx)
+
+function checkConditions(
+  tr: TTransaction,
+  conditions?: TrCondition,
+  ctx?: CheckContext
+): boolean {
   // Check if transaction is deleted even if it's not specified in conditions
   // (usually we don't want deleted transactions)
   if (!checkDeleted(tr, conditions?.showDeleted)) return false
   // No conditions - return true
   if (!conditions) return true
   // Now check all other conditions
-  return keys(conditions).every(key => checkKey(key, tr, conditions))
+  return keys(conditions).every(key => checkKey(key, tr, conditions, ctx))
 }
 
 /**
@@ -61,18 +74,20 @@ function checkConditions(tr: TTransaction, conditions?: TrCondition): boolean {
  * @param key key of the condition
  * @param tr transaction
  * @param conditions object with conditions
+ * @param ctx extra lookups (merchants, etc.)
  */
 function checkKey(
   key: keyof TrCondition,
   tr: TTransaction,
-  conditions?: TrCondition
+  conditions?: TrCondition,
+  ctx?: CheckContext
 ): boolean {
   if (!conditions || conditions[key] === undefined) return true
 
   switch (key) {
     /* Handle custom conditions */
     case 'search':
-      return checkSearch(tr, conditions[key])
+      return checkSearch(tr, conditions[key], ctx)
     case 'type':
       return checkType(tr, conditions[key])
     case 'showDeleted':
@@ -97,12 +112,15 @@ function checkKey(
     /* Handle logical operators */
     case 'or':
       return (
-        conditions.or?.some(condition => checkConditions(tr, condition)) ?? true
+        conditions.or?.some(condition =>
+          checkConditions(tr, condition, ctx)
+        ) ?? true
       )
     case 'and':
       return (
-        conditions.and?.every(condition => checkConditions(tr, condition)) ??
-        true
+        conditions.and?.every(condition =>
+          checkConditions(tr, condition, ctx)
+        ) ?? true
       )
 
     /* Handle basic conditions */
@@ -117,12 +135,23 @@ function checkKey(
 
 // Custom condition handlers
 
-function checkSearch(tr: TTransaction, condition?: TrCondition['search']) {
+function checkSearch(
+  tr: TTransaction,
+  condition?: TrCondition['search'],
+  ctx?: CheckContext
+) {
   if (!condition) return true
   const upperCondition = condition.toUpperCase()
+  // In the list the displayed name is the merchant title when a merchant is
+  // set, otherwise the payee. Search has to look at both so it matches what
+  // the user actually sees.
+  const merchantTitle = tr.merchant
+    ? ctx?.merchants?.[tr.merchant]?.title
+    : undefined
   const textMatch =
     tr.comment?.toUpperCase().includes(upperCondition) ||
-    tr.payee?.toUpperCase().includes(upperCondition)
+    tr.payee?.toUpperCase().includes(upperCondition) ||
+    merchantTitle?.toUpperCase().includes(upperCondition)
   if (textMatch) return true
   return checkAmountSearch(tr, condition)
 }
