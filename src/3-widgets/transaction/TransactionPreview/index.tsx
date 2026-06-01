@@ -14,6 +14,7 @@ import {
 } from '@mui/material'
 import { DatePicker } from '@mui/x-date-pickers'
 import { Tooltip } from '6-shared/ui/Tooltip'
+import { useSnackbar } from '6-shared/ui/SnackbarProvider'
 import {
   DeleteIcon,
   CloseIcon,
@@ -73,6 +74,13 @@ const TransactionContent: FC<TransactionPreviewProps> = props => {
   const { id, onClose, onOpenOther, onSelectSimilar } = props
   const { t } = useTranslation('transaction')
   const dispatch = useAppDispatch()
+  const setSnackbar = useSnackbar()
+  const onCopyId = () => {
+    navigator.clipboard
+      ?.writeText(id)
+      .then(() => setSnackbar({ message: t('idCopied') }))
+      .catch(() => {})
+  }
   const onDelete = () => dispatch(trModel.deleteTransactions([id]))
   const onDeletePermanently = () =>
     dispatch(trModel.deleteTransactionsPermanently([id]))
@@ -291,6 +299,19 @@ const TransactionContent: FC<TransactionPreviewProps> = props => {
               date: formatDate(changed, 'dd MMM yyyy, HH:mm'),
             })}
           </span>
+          <Tooltip title={t('copyId')}>
+            <Box
+              component="span"
+              onClick={onCopyId}
+              sx={{
+                cursor: 'pointer',
+                width: 'fit-content',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+            >
+              {t('id', { id })}
+            </Box>
+          </Tooltip>
           <RateToWords tr={tr} />
         </Stack>
 
