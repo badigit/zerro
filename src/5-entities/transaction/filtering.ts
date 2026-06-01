@@ -118,12 +118,35 @@ function checkKey(
 // Custom condition handlers
 
 function checkSearch(tr: TTransaction, condition?: TrCondition['search']) {
-  const upperCondition = condition?.toUpperCase()
-  return Boolean(
-    !upperCondition ||
-      tr.comment?.toUpperCase().includes(upperCondition) ||
-      tr.payee?.toUpperCase().includes(upperCondition)
-  )
+  if (!condition) return true
+  const upperCondition = condition.toUpperCase()
+  const textMatch =
+    tr.comment?.toUpperCase().includes(upperCondition) ||
+    tr.payee?.toUpperCase().includes(upperCondition)
+  if (textMatch) return true
+  return checkAmountSearch(tr, condition)
+}
+
+/**
+ * Matches the search string against transaction amounts (income/outcome).
+ * Only kicks in when the input parses as a number. Accepts comma as a decimal
+ * separator and ignores spaces (thousands separators).
+ *
+ * - Integer input matches the whole-unit part, so `147600` finds `147600.50`.
+ * - Fractional input requires an exact amount match, so `147600.5` is precise.
+ */
+function checkAmountSearch(tr: TTransaction, condition: string) {
+  const normalized = condition.trim().replace(/\s/g, '').replace(',', '.')
+  if (!/^\d+(\.\d+)?$/.test(normalized)) return false
+  const value = Number(normalized)
+  if (!Number.isFinite(value)) return false
+  const hasFraction = normalized.includes('.')
+  return [tr.income, tr.outcome].some(amount => {
+    if (!amount) return false
+    return hasFraction
+      ? Math.abs(amount - value) < 1e-6
+      : Math.floor(amount) === value
+  })
 }
 
 function checkType(tr: TTransaction, condition?: TrCondition['type']) {
