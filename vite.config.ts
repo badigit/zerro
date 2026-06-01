@@ -19,6 +19,16 @@ export default defineConfig({
       },
     }),
   ],
+  server: {
+    host: '0.0.0.0',
+    // Pinned to 3000: the ZenMoney OAuth app (REACT_APP_REDIRECT_URI) is
+    // registered with redirect_uri http://localhost:3000, so the dev server
+    // MUST listen here or the auth callback breaks (ERR_CONNECTION_REFUSED).
+    // strictPort: fail loudly if 3000 is taken instead of hopping to a port
+    // that would also break the OAuth redirect.
+    port: 3000,
+    strictPort: true,
+  },
   build: {
     outDir: 'dist',
     sourcemap: true,
