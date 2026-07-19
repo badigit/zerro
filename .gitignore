@@ -38,3 +38,9 @@ yarn-error.log*
 # local agent tooling
 /.claude
 /CLAUDE.md
+/AGENTS.md
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
