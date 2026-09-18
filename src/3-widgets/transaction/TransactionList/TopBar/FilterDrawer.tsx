@@ -54,11 +54,16 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
   const populatedAccounts = accountModel.usePopulatedAccounts()
   const merchants = merchantModel.useMerchants()
 
+  // Архивные счета не прячем: спрятанный, но выбранный счёт продолжает
+  // фильтровать список, а снять его в drawer было нечем — оставалась только
+  // кнопка «Очистить фильтры». Поэтому архивные показываем с пометкой и
+  // опускаем в конец списка.
   const accountOptions = useMemo(
     () =>
-      Object.values(populatedAccounts)
-        .filter(a => !a.archive)
-        .sort((a, b) => a.title.localeCompare(b.title)),
+      Object.values(populatedAccounts).sort((a, b) => {
+        if (Boolean(a.archive) !== Boolean(b.archive)) return a.archive ? 1 : -1
+        return a.title.localeCompare(b.title)
+      }),
     [populatedAccounts]
   )
 
@@ -147,6 +152,7 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
               <FilterDatePicker
                 label={t('dateFrom')}
                 value={conditions.dateFrom}
+                maxDate={conditions.dateTo}
                 onChange={dateFrom => setCondition({ dateFrom })}
               />
             </Grid>
@@ -154,6 +160,7 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
               <FilterDatePicker
                 label={t('dateTo')}
                 value={conditions.dateTo}
+                minDate={conditions.dateFrom}
                 onChange={dateTo => setCondition({ dateTo })}
               />
             </Grid>
@@ -200,7 +207,11 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
           <Autocomplete
             multiple
             options={accountOptions}
-            getOptionLabel={option => option.title}
+            getOptionLabel={option =>
+              option.archive
+                ? t('archivedAccount', { title: option.title })
+                : option.title
+            }
             isOptionEqualToValue={(option, value) => option.id === value.id}
             value={accountOptions.filter(a =>
               selectedAccountIds.includes(a.id)
@@ -233,7 +244,11 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
               })
             }}
             renderInput={params => (
-              <TextField {...params} label={t('merchants')} variant="outlined" />
+              <TextField
+                {...params}
+                label={t('merchants')}
+                variant="outlined"
+              />
             )}
           />
         </Box>
@@ -302,8 +317,11 @@ export default FilterDrawer
 const FilterDatePicker: FC<{
   label: string
   value?: TISODate
+  /** Границы диапазона: вторая дата не даёт выбрать пустой интервал */
+  minDate?: TISODate
+  maxDate?: TISODate
   onChange: (value: TISODate | undefined) => void
-}> = ({ label, value, onChange }) => {
+}> = ({ label, value, minDate, maxDate, onChange }) => {
   const [draft, setDraft] = useState<Date | null>(
     value ? parseDate(value) : null
   )
@@ -313,10 +331,18 @@ const FilterDatePicker: FC<{
     <DatePicker
       label={label}
       value={draft}
+      minDate={minDate ? parseDate(minDate) : undefined}
+      maxDate={maxDate ? parseDate(maxDate) : undefined}
       onChange={date => {
         setDraft(date)
         if (!date) return onChange(undefined)
-        if (isValidDate(date)) onChange(toISODate(date))
+        if (!isValidDate(date)) return
+        const iso = toISODate(date)
+        // Дата вне диапазона (ввод с клавиатуры минует ограничения календаря)
+        // дала бы молча пустой список — держим черновик, условие не трогаем.
+        if (minDate && iso < minDate) return
+        if (maxDate && iso > maxDate) return
+        onChange(iso)
         // Незавершённый ввод: держим черновик, условие не трогаем.
       }}
       format="dd.MM.yyyy"
@@ -329,8 +355,12 @@ const FilterDatePicker: FC<{
 function extractInIds(cond: TrCondition['account' | 'merchant']): string[] {
   if (!cond) return []
   if (typeof cond === 'string') return [cond]
-  if (typeof cond === 'object' && cond !== null && 'in' in cond && cond.in)
-    return cond.in as string[]
+  // `in` по типу может содержать вложенные условия, а не только id —
+  // берём из него строки, остальное игнорируем.
+  if (typeof cond === 'object' && cond !== null && 'in' in cond && cond.in) {
+    const items: unknown[] = cond.in
+    return items.filter((c): c is string => typeof c === 'string')
+  }
   return []
 }
 

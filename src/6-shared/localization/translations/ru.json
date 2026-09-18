@@ -525,6 +525,7 @@
     "showDeleted": "Показать удалённые",
     "categories": "Категории",
     "accounts": "Счета",
+    "archivedAccount": "{{title}} (архив)",
     "merchants": "Мерчанты",
     "clearFilter": "Очистить фильтры",
     "clearField": "Очистить поле",
