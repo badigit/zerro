@@ -20,7 +20,10 @@ export default defineConfig({
     }),
   ],
   server: {
-    host: '0.0.0.0',
+    // host не задаём: дефолтный localhost. Bind на все интерфейсы открывал
+    // дев-сборку с финансовыми данными всей локальной сети, а для OAuth-редиректа
+    // нужен только пин порта. Доступ с телефона включается разово:
+    // pnpm run dev -- --host
     // Pinned to 3000: the ZenMoney OAuth app (REACT_APP_REDIRECT_URI) is
     // registered with redirect_uri http://localhost:3000, so the dev server
     // MUST listen here or the auth callback breaks (ERR_CONNECTION_REFUSED).
