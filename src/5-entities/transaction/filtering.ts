@@ -141,7 +141,7 @@ function checkSearch(
   ctx?: CheckContext
 ) {
   if (!condition) return true
-  const upperCondition = condition.toUpperCase()
+  const { upperCondition, amount } = parseSearchQuery(condition)
   // In the list the displayed name is the merchant title when a merchant is
   // set, otherwise the payee. Search has to look at both so it matches what
   // the user actually sees.
@@ -153,24 +153,88 @@ function checkSearch(
     tr.payee?.toUpperCase().includes(upperCondition) ||
     merchantTitle?.toUpperCase().includes(upperCondition)
   if (textMatch) return true
-  return checkAmountSearch(tr, condition)
+  return checkAmountSearch(tr, amount)
+}
+
+type TAmountQuery = {
+  value: number
+  /** Fractional input requires an exact match, integer input matches by whole units */
+  hasFraction: boolean
+}
+
+type TSearchQuery = {
+  upperCondition: string
+  amount: TAmountQuery | null
 }
 
 /**
- * Matches the search string against transaction amounts (income/outcome).
- * Only kicks in when the input parses as a number. Accepts comma as a decimal
- * separator and ignores spaces (thousands separators).
- *
- * - Integer input matches the whole-unit part, so `147600` finds `147600.50`.
- * - Fractional input requires an exact amount match, so `147600.5` is precise.
+ * Разбор строки поиска считается один раз на прогон, а не на каждую транзакцию:
+ * условие поиска в рамках одного прогона всегда одно и то же, а список
+ * транзакций — десятки тысяч.
  */
-function checkAmountSearch(tr: TTransaction, condition: string) {
-  const normalized = condition.trim().replace(/\s/g, '').replace(',', '.')
-  if (!/^\d+(\.\d+)?$/.test(normalized)) return false
+let searchQueryCache: { raw: string; query: TSearchQuery } | undefined
+
+function parseSearchQuery(raw: string): TSearchQuery {
+  if (searchQueryCache?.raw === raw) return searchQueryCache.query
+  const query: TSearchQuery = {
+    upperCondition: raw.toUpperCase(),
+    amount: parseAmountQuery(raw),
+  }
+  searchQueryCache = { raw, query }
+  return query
+}
+
+/**
+ * Parses the search string as an amount. Spaces (including NBSP) are treated as
+ * thousands separators and ignored. Both `.` and `,` can separate thousands or
+ * the fraction, so the last separator decides:
+ *
+ * - `1,234` / `1 234` → 1234 (three digits after the separator = thousands)
+ * - `1,234,56` / `1 234,56` → 1234.56
+ * - `147600.5` → fractional (a lone dot is always a decimal point)
+ * - Anything that is not a number → null, the amount check is skipped.
+ */
+function parseAmountQuery(raw: string): TAmountQuery | null {
+  const compact = raw.trim().replace(/[\s ]/g, '')
+  if (!/^\d[\d.,]*$/.test(compact)) return null
+
+  const lastSeparator = Math.max(
+    compact.lastIndexOf('.'),
+    compact.lastIndexOf(',')
+  )
+  if (lastSeparator === -1) {
+    const value = Number(compact)
+    return Number.isFinite(value) ? { value, hasFraction: false } : null
+  }
+
+  const tail = compact.slice(lastSeparator + 1)
+  const separatorCount = compact.replace(/\d/g, '').length
+  const isDecimalPoint =
+    tail.length === 0
+      ? false
+      : separatorCount === 1 && compact[lastSeparator] === '.'
+        ? true
+        : tail.length <= 2
+
+  const digitsOnly = (s: string) => s.replace(/[.,]/g, '')
+  const normalized = isDecimalPoint
+    ? digitsOnly(compact.slice(0, lastSeparator)) + '.' + tail
+    : digitsOnly(compact)
+
   const value = Number(normalized)
-  if (!Number.isFinite(value)) return false
-  const hasFraction = normalized.includes('.')
-  return [tr.income, tr.outcome].some(amount => {
+  if (!Number.isFinite(value)) return null
+  return { value, hasFraction: isDecimalPoint }
+}
+
+/**
+ * Matches the parsed amount against transaction amounts. Original amounts
+ * (opIncome/opOutcome) are checked too: the list shows 25 EUR while the
+ * transaction stores 2300 RUB, and searching for 25 has to find it.
+ */
+function checkAmountSearch(tr: TTransaction, query: TAmountQuery | null) {
+  if (!query) return false
+  const { value, hasFraction } = query
+  return [tr.income, tr.outcome, tr.opIncome, tr.opOutcome].some(amount => {
     if (!amount) return false
     return hasFraction
       ? Math.abs(amount - value) < 1e-6
