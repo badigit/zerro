@@ -196,7 +196,9 @@ function parseSearchQuery(raw: string): TSearchQuery {
  */
 function parseAmountQuery(raw: string): TAmountQuery | null {
   const compact = raw.trim().replace(/[\s ]/g, '')
-  if (!/^\d[\d.,]*$/.test(compact)) return null
+  // Разделитель обязан стоять между цифрами: `12..34` и `1,` это опечатки,
+  // а не числа, и совпадений по сумме давать не должны.
+  if (!/^\d+([.,]\d+)*$/.test(compact)) return null
 
   const lastSeparator = Math.max(
     compact.lastIndexOf('.'),
@@ -210,11 +212,9 @@ function parseAmountQuery(raw: string): TAmountQuery | null {
   const tail = compact.slice(lastSeparator + 1)
   const separatorCount = compact.replace(/\d/g, '').length
   const isDecimalPoint =
-    tail.length === 0
-      ? false
-      : separatorCount === 1 && compact[lastSeparator] === '.'
-        ? true
-        : tail.length <= 2
+    separatorCount === 1 && compact[lastSeparator] === '.'
+      ? true
+      : tail.length <= 2
 
   const digitsOnly = (s: string) => s.replace(/[.,]/g, '')
   const normalized = isDecimalPoint

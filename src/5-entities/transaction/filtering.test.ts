@@ -105,6 +105,12 @@ describe('checkRaw: поиск по суммам', () => {
     expect(matches(makeTr({ outcome: 100 }), '')).toBe(true) // пустой поиск = без фильтра
   })
 
+  test('опечатки в разделителях не дают ложных совпадений', () => {
+    expect(matches(makeTr({ outcome: 12.34 }), '12..34')).toBe(false)
+    expect(matches(makeTr({ outcome: 1.2 }), '1,,2')).toBe(false)
+    expect(matches(makeTr({ outcome: 1 }), '1,')).toBe(false)
+  })
+
   test('нулевая сумма не совпадает с поиском нуля', () => {
     expect(matches(makeTr({ outcome: 100 }), '0')).toBe(false)
   })
