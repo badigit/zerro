@@ -1,4 +1,4 @@
-import React, { FC, useMemo } from 'react'
+import React, { FC, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Drawer,
@@ -26,6 +26,7 @@ import { accountModel } from '5-entities/account'
 import { merchantModel } from '5-entities/merchant'
 import { TrCondition } from '5-entities/transaction'
 import { TrType } from '5-entities/transaction'
+import type { TISODate } from '6-shared/types'
 
 const drawerWidth = { xs: '100vw', sm: 360 }
 const contentSx = {
@@ -81,14 +82,6 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
     const value = e.target.value as TrType
     setCondition({ type: value || undefined })
   }
-
-  // DatePicker зовёт onChange на каждый кейстрок и при незавершённом вводе
-  // отдаёт Invalid Date. Она truthy, и toISODate вернула бы литерал
-  // 'NaN-NaN-NaN': checkDateFrom сравнивает ISO-даты строками, а 'NaN-...'
-  // больше любой настоящей даты — фильтр отсекал бы ВСЕ транзакции.
-  // Незавершённый ввод трактуем как «граница не задана».
-  const toDateCondition = (date: Date | null) =>
-    date && isValidDate(date) ? toISODate(date) : undefined
 
   const { gte, lte } = getGteLte(conditions.amount)
 
@@ -151,25 +144,17 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
         <Box sx={{ mt: 3, display: 'flex' }}>
           <Grid container spacing={3}>
             <Grid size={6}>
-              <DatePicker
+              <FilterDatePicker
                 label={t('dateFrom')}
-                value={conditions.dateFrom ? parseDate(conditions.dateFrom) : null}
-                onChange={date =>
-                  setCondition({ dateFrom: toDateCondition(date) })
-                }
-                format="dd.MM.yyyy"
-                slotProps={{ textField: { variant: 'outlined', fullWidth: true } }}
+                value={conditions.dateFrom}
+                onChange={dateFrom => setCondition({ dateFrom })}
               />
             </Grid>
             <Grid size={6}>
-              <DatePicker
+              <FilterDatePicker
                 label={t('dateTo')}
-                value={conditions.dateTo ? parseDate(conditions.dateTo) : null}
-                onChange={date =>
-                  setCondition({ dateTo: toDateCondition(date) })
-                }
-                format="dd.MM.yyyy"
-                slotProps={{ textField: { variant: 'outlined', fullWidth: true } }}
+                value={conditions.dateTo}
+                onChange={dateTo => setCondition({ dateTo })}
               />
             </Grid>
           </Grid>
@@ -299,6 +284,46 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
 }
 
 export default FilterDrawer
+
+/**
+ * Дата-граница фильтра со своим черновиком.
+ *
+ * DatePicker зовёт onChange на каждый кейстрок и при незавершённом вводе отдаёт
+ * Invalid Date. Она truthy, поэтому её нельзя отсеивать простым `date ? ... :
+ * undefined`: toISODate вернёт литерал 'NaN-NaN-NaN', а checkDateFrom сравнивает
+ * ISO-даты строками — 'NaN-...' больше любой настоящей даты, и фильтр отсекает
+ * ВСЕ транзакции.
+ *
+ * Черновик нужен, чтобы не ломать правку уже заданной даты: если гнать Invalid
+ * Date в условие как undefined, controlled-value схлопнется в null и MUI сотрёт
+ * незавершённый ввод прямо под руками. Поэтому промежуточное значение живёт
+ * локально, а наружу уезжает только валидная дата либо явная очистка поля.
+ */
+const FilterDatePicker: FC<{
+  label: string
+  value?: TISODate
+  onChange: (value: TISODate | undefined) => void
+}> = ({ label, value, onChange }) => {
+  const [draft, setDraft] = useState<Date | null>(
+    value ? parseDate(value) : null
+  )
+  // Внешняя смена условия (выбор в календаре, «Очистить всё») доезжает в поле.
+  useEffect(() => setDraft(value ? parseDate(value) : null), [value])
+  return (
+    <DatePicker
+      label={label}
+      value={draft}
+      onChange={date => {
+        setDraft(date)
+        if (!date) return onChange(undefined)
+        if (isValidDate(date)) onChange(toISODate(date))
+        // Незавершённый ввод: держим черновик, условие не трогаем.
+      }}
+      format="dd.MM.yyyy"
+      slotProps={{ textField: { variant: 'outlined', fullWidth: true } }}
+    />
+  )
+}
 
 /** Pulls a flat list of ids out of an `{ in: [...] }` / bare-string condition. */
 function extractInIds(cond: TrCondition['account' | 'merchant']): string[] {
