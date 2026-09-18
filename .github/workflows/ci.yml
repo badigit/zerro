@@ -1,0 +1,31 @@
+# Минимальный гейт форка: типы и тесты. Апстрим живёт на Vercel и своих
+# workflow не держит, поэтому локальные фичи форка проверять было нечем.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # Версия берётся из поля packageManager в package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # lint в этом репо — это tsc --noEmit
+      - run: pnpm run lint
+
+      # vitest без --run уходит в watch и висит до таймаута
+      - run: pnpm exec vitest run
