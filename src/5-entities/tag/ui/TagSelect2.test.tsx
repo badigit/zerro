@@ -9,9 +9,24 @@ import dataReducer from 'store/data'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { TagSelect2 } from './TagSelect2'
 
-vi.mock('i18next', () => ({
-  t: (key: string) => key,
-}))
+// i18n.ts инициализирует настоящий i18next прямо на импорте (i18n.use().init()),
+// поэтому моку нужен default-экспорт с цепочкой use/init — иначе падает сборка
+// всего файла. Заглушка возвращает сам ключ: тесты сверяются с ключами, не с
+// переводами.
+vi.mock('i18next', () => {
+  const t = (key: string) => key
+  const instance = {
+    t,
+    use: () => instance,
+    init: () => Promise.resolve(t),
+    on: () => {},
+    off: () => {},
+    changeLanguage: () => Promise.resolve(t),
+    language: 'en',
+    resolvedLanguage: 'en',
+  }
+  return { default: instance, t }
+})
 
 function makeOutcomeTag(id: string, title: string): TTag {
   return {
