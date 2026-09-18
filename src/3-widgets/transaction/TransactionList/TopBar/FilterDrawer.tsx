@@ -327,6 +327,18 @@ const FilterDatePicker: FC<{
   )
   // Внешняя смена условия (выбор в календаре, «Очистить всё») доезжает в поле.
   useEffect(() => setDraft(value ? parseDate(value) : null), [value])
+
+  // Черновик, отвергнутый границей (перенос диапазона вперёд: сначала «дата от»
+  // за старую «дату до»), становится допустимым после сдвига второй границы.
+  // Без этого поле показывало бы одну дату, а фильтровал бы список другой.
+  useEffect(() => {
+    if (!draft || !isValidDate(draft)) return
+    const iso = toISODate(draft)
+    if (iso === value) return
+    if (minDate && iso < minDate) return
+    if (maxDate && iso > maxDate) return
+    onChange(iso)
+  }, [draft, value, minDate, maxDate, onChange])
   return (
     <DatePicker
       label={label}
