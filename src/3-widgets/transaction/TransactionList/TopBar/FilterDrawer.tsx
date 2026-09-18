@@ -20,7 +20,7 @@ import { DatePicker } from '@mui/x-date-pickers'
 import { Tooltip } from '6-shared/ui/Tooltip'
 import { CloseIcon } from '6-shared/ui/Icons'
 import { SmartSelect } from '6-shared/ui/SmartSelect'
-import { parseDate, toISODate } from '6-shared/helpers/date'
+import { isValidDate, parseDate, toISODate } from '6-shared/helpers/date'
 import { TagSelect } from '5-entities/tag/ui/TagSelect'
 import { accountModel } from '5-entities/account'
 import { merchantModel } from '5-entities/merchant'
@@ -81,6 +81,14 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
     const value = e.target.value as TrType
     setCondition({ type: value || undefined })
   }
+
+  // DatePicker зовёт onChange на каждый кейстрок и при незавершённом вводе
+  // отдаёт Invalid Date. Она truthy, и toISODate вернула бы литерал
+  // 'NaN-NaN-NaN': checkDateFrom сравнивает ISO-даты строками, а 'NaN-...'
+  // больше любой настоящей даты — фильтр отсекал бы ВСЕ транзакции.
+  // Незавершённый ввод трактуем как «граница не задана».
+  const toDateCondition = (date: Date | null) =>
+    date && isValidDate(date) ? toISODate(date) : undefined
 
   const { gte, lte } = getGteLte(conditions.amount)
 
@@ -147,9 +155,7 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
                 label={t('dateFrom')}
                 value={conditions.dateFrom ? parseDate(conditions.dateFrom) : null}
                 onChange={date =>
-                  setCondition({
-                    dateFrom: date ? toISODate(date) : undefined,
-                  })
+                  setCondition({ dateFrom: toDateCondition(date) })
                 }
                 format="dd.MM.yyyy"
                 slotProps={{ textField: { variant: 'outlined', fullWidth: true } }}
@@ -160,9 +166,7 @@ const FilterDrawer: FC<FilterDrawerProps> = ({
                 label={t('dateTo')}
                 value={conditions.dateTo ? parseDate(conditions.dateTo) : null}
                 onChange={date =>
-                  setCondition({
-                    dateTo: date ? toISODate(date) : undefined,
-                  })
+                  setCondition({ dateTo: toDateCondition(date) })
                 }
                 format="dd.MM.yyyy"
                 slotProps={{ textField: { variant: 'outlined', fullWidth: true } }}
