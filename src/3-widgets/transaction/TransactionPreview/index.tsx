@@ -76,10 +76,18 @@ const TransactionContent: FC<TransactionPreviewProps> = props => {
   const dispatch = useAppDispatch()
   const setSnackbar = useSnackbar()
   const onCopyId = () => {
-    navigator.clipboard
-      ?.writeText(id)
+    // В non-secure контексте (http на телефоне, локальная сеть) clipboard
+    // отсутствует вовсе — молчаливый клик выглядит как «кнопка сломана»,
+    // поэтому о неудаче сообщаем тем же снекбаром, что и об успехе.
+    const clipboard = navigator.clipboard
+    if (!clipboard) {
+      setSnackbar({ message: t('idCopyFailed') })
+      return
+    }
+    clipboard
+      .writeText(id)
       .then(() => setSnackbar({ message: t('idCopied') }))
-      .catch(() => {})
+      .catch(() => setSnackbar({ message: t('idCopyFailed') }))
   }
   const onDelete = () => dispatch(trModel.deleteTransactions([id]))
   const onDeletePermanently = () =>
@@ -302,11 +310,20 @@ const TransactionContent: FC<TransactionPreviewProps> = props => {
           <Tooltip title={t('copyId')}>
             <Box
               component="span"
+              role="button"
+              tabIndex={0}
               onClick={onCopyId}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onCopyId()
+                }
+              }}
               sx={{
                 cursor: 'pointer',
                 width: 'fit-content',
                 '&:hover': { textDecoration: 'underline' },
+                '&:focus-visible': { textDecoration: 'underline' },
               }}
             >
               {t('id', { id })}

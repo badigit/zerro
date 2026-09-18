@@ -479,6 +479,7 @@ export const en: typeof ru = {
     id: 'ID: {{id}}',
     copyId: 'Copy ID',
     idCopied: 'Transaction ID copied',
+    idCopyFailed: 'Could not copy the ID',
     btnOtherFromSync: 'Others from this sync',
     type_income: 'Income',
     type_outcome: 'Expense',

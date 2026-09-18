@@ -458,6 +458,7 @@
     "id": "ID: {{id}}",
     "copyId": "Скопировать ID",
     "idCopied": "ID операции скопирован",
+    "idCopyFailed": "Не удалось скопировать ID",
     "btnOtherFromSync": "Другие из этой синхронизации",
     "type_income": "Доход",
     "type_outcome": "Расход",
